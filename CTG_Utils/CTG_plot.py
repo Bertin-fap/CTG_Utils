@@ -16,7 +16,7 @@ def plot_club_38():
 
 
     df = pd.read_excel(GLOBAL['ROOT'] / Path('club_38.xlsx'))
-    path_villes_de_france = Path(__file__).parent.parent / Path('CTG_RefFiles/villes_france_premium.csv')
+    path_villes_de_france = Path(__file__).parent / Path('CTG_RefFiles/villes_france_premium.csv')
     df_villes = pd.read_csv(path_villes_de_france,header=None,usecols=[2,19,20])
     dic_long = dict(zip(df_villes[2] , df_villes[19]))
     dic_lat = dict(zip(df_villes[2] , df_villes[20]))
@@ -82,7 +82,7 @@ def built_lat_long(df):
     import numpy as np
     import pandas as pd
     
-    path_villes_de_france = Path(__file__).parent.parent / Path('CTG_RefFiles/villes_france_premium.csv')
+    path_villes_de_france = Path(__file__).parent / Path('CTG_RefFiles/villes_france_premium.csv')
     df_villes = pd.read_csv(path_villes_de_france,header=None,usecols=[3,19,20])
     dic_long = dict(zip(df_villes[3] , df_villes[19]))
     dic_lat = dict(zip(df_villes[3] , df_villes[20]))

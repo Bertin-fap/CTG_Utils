@@ -10,7 +10,7 @@ def _config_ctg():
     import yaml
     
     # Reads the default PVcharacterization.yaml config file
-    path_config_file = Path(__file__).parent.parent / Path('CTG_RefFiles/CTG.yaml')
+    path_config_file = Path(__file__).parent / Path('CTG_RefFiles/CTG.yaml')
     with open(path_config_file) as file:
         global_ = yaml.safe_load(file)
         
