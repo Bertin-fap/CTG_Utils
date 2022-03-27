@@ -114,22 +114,24 @@ def inscrit_sejour(file,no_match,df_effectif):
 
 def correction_effectif():
     
-    list_non_licencie = [('PIERRETTE','GAUDE'),
-                         ('NICOLE','SEREAULT'),
-                         ('ROGER','SEREAULT'),
-                         ('CHRISTIANE','BOUTET-MATTY'),
-                         ('SILVENTE','CHAREYRE'),
-                         ('ANNIE','GALLAND-GOURDON')]
+    # Standard library import
+    from pathlib import Path
+    
+    #3rd party import
+    import yaml
+    
+    path_cor_yaml = Path(__file__).parent.parent / Path('CTG_RefFiles/CTG_correction.yaml')
+    
+    with open(path_cor_yaml, "r",encoding='utf8') as stream:
+        data_list_dict = yaml.safe_load(stream)
 
-    dic_correction_licence = {560873:{'Nom':'PARADE', 'Prénom': 'MARIE-CHRISTINE'},
-                              763041:{'Nom':'METRAL-CHARVET', 'Prénom': 'JACQUES'},
-                              796380:{'Nom':'METRAL-CHARVET', 'Prénom': 'CATHERINE'},
-                              825377:{'Nom':'MOUTIN-LUYAT', 'Prénom': 'LAURENT'},
-                              545091:{'Nom':'PAIRE-LEITNER', 'Prénom': 'LUCIE'},
-                             }
-    dic_part_club = [('DOMINIQUE','HENAULT'),('ALAIN','PERROUD')]
+    list_non_licencie = [(x.split(',')[0].strip(),x.split(',')[1].strip()) for x in data_list_dict['list_non_licencie']]
+    dic_part_club = [(x.split(',')[0].strip(),x.split(',')[1].strip()) for x in data_list_dict['dic_part_club']]
+    dic_correction_licence = data_list_dict['dic_correction_licence']
+    dic_correction_licence = {list(x.keys())[0] : list(x.values())[0] for x in dic_correction_licence}
     
     return list_non_licencie, dic_correction_licence, dic_part_club
+
     
 def count_participation(path):
     
