@@ -1,0 +1,16 @@
+LICENSE
+MANIFEST.in
+README.md
+setup.py
+CTG_Utils/CTG_config.py
+CTG_Utils/CTG_effectif.py
+CTG_Utils/CTG_plot.py
+CTG_Utils/__init__.py
+CTG_Utils.egg-info/PKG-INFO
+CTG_Utils.egg-info/SOURCES.txt
+CTG_Utils.egg-info/dependency_links.txt
+CTG_Utils.egg-info/requires.txt
+CTG_Utils.egg-info/top_level.txt
+CTG_Utils/CTG_RefFiles/CTG.yaml
+CTG_Utils/CTG_RefFiles/CTG_correction.yaml
+CTG_Utils/CTG_RefFiles/villes_france_premium.csv
