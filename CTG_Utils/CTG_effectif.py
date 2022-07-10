@@ -18,14 +18,14 @@ def read_effectif_corrected(dic_correction_licence, list_non_licencie, part_club
     import numpy as np
     import pandas as pd
     
-    prenom, nom = zip(*list_non_licencie)
-    dict_non_licencie = {'N° Licencié':np.array(range(len(nom)))+10, 'Prénom':prenom,'Nom':nom}
+    prenom, nom, sexe = zip(*list_non_licencie)
+    dict_non_licencie = {'N° Licencié':np.array(range(len(nom)))+10, 'Prénom':prenom,'Nom':nom,'Sexe':sexe}
     
-    prenom, nom = zip(*part_club)
-    part_club = {'N° Licencié':list(range(len(part_club))), 'Prénom':prenom,'Nom':nom}
+    prenom, nom, sexe = zip(*part_club)
+    part_club = {'N° Licencié':list(range(len(part_club))), 'Prénom':prenom,'Nom':nom,'Sexe':sexe}
 
     df_effectif = pd.read_excel(GLOBAL['ROOT'] / Path(GLOBAL['EFFECTIF']))
-    df_effectif = df_effectif[['N° Licencié', 'Nom','Prénom']]
+    df_effectif = df_effectif[['N° Licencié', 'Nom','Prénom','Sexe']]
     
         
     for num_licence in dic_correction_licence.keys():
@@ -61,54 +61,57 @@ def inscrit_sejour(file,no_match,df_effectif):
                                      decode('utf-8').\
                                      strip()
 
-    df = pd.read_csv(file)  
-    
-    dg = df['Unnamed: 0'].str.upper()
-    dg = dg.dropna()
-    dg = dg.str.replace(' \t?','',regex=False)
-    dg = dg.str.replace('JO ','JOSEPH ')
-    dg = dg.str.replace('HERVÉ.P','PEREZ HERVE',regex=False)
-    dg = dg.str.replace('MARTINE HENAULT-VAILLI','MARTINE HENAULT',regex=False)
-    dg = dg.str.replace('.',' ',regex=False)
-    dg = dg.apply(convert_to_ascii)
-    dg = dg.drop_duplicates()
-    dg = dg.str.split('\s{1,10}')
-    
-    dg = dg.apply(lambda row : row+[None] if len(row)==2 else row)
-
-    split_dg = pd.DataFrame(dg.tolist(), columns=['name1', 'name2', 'name3'])
+    df = pd.read_csv(file) 
     sejour = os.path.splitext(os.path.basename(file))[0]
     
-    dic = {}
-    for idx,row in split_dg.iterrows():
-        if (row.name3 is None) and ( row.name2 is not None):
-            if len(row.name1)==1:
-                dr = df_effectif.query('Prénom1==@row.name1[0] and Nom==@row.name2')
-                if len(dr):
-                    dic[idx] =dr.iloc[0].tolist()[:-1]+[sejour]
+    if len(df) != 0:
+        dg = df['Unnamed: 0'].str.upper()
+        dg = dg.dropna()
+        dg = dg.str.replace(' \t?','',regex=False)
+        dg = dg.str.replace('JO ','JOSEPH ')
+        dg = dg.str.replace('HERVÉ.P','PEREZ HERVE',regex=False)
+        dg = dg.str.replace('MARTINE HENAULT-VAILLI','MARTINE HENAULT',regex=False)
+        dg = dg.str.replace('.',' ',regex=False)
+        dg = dg.apply(convert_to_ascii)
+        dg = dg.drop_duplicates()
+        dg = dg.str.split('\s{1,10}')
+
+        dg = dg.apply(lambda row : row+[None] if len(row)==2 else row)
+
+        split_dg = pd.DataFrame(dg.tolist(), columns=['name1', 'name2', 'name3'])
+
+        dic = {}
+        for idx,row in split_dg.iterrows():
+            if (row.name3 is None) and ( row.name2 is not None):
+                if len(row.name1)==1:
+                    dr = df_effectif.query('Prénom1==@row.name1[0] and Nom==@row.name2')
+                    if len(dr):
+                        dic[idx] =dr.iloc[0].tolist()[:-1]+[sejour]
+                    else:
+                        print('no match',row.name2,row.name1)
+                        no_match.append((row.name2,row.name1))
+                elif len(row.name2)==1:
+                    dr = df_effectif.query('Prénom1==@row.name2 and Nom==@row.name1')
+                    if len(dr):
+                         dic[idx] =dr.iloc[0].tolist()[:-1]+[sejour]
+                    else:
+                        print('no match',row.name2,row.name1)
+                        no_match.append((row.name2,row.name1))
                 else:
-                    print('no match',row.name2,row.name1)
-                    no_match.append((row.name2,row.name1))
-            elif len(row.name2)==1:
-                dr = df_effectif.query('Prénom1==@row.name2 and Nom==@row.name1')
-                if len(dr):
-                     dic[idx] =dr.iloc[0].tolist()[:-1]+[sejour]
-                else:
-                    print('no match',row.name2,row.name1)
-                    no_match.append((row.name2,row.name1))
+                    if len((dr:=df_effectif.query('Prénom==@row.name2 and Nom==@row.name1'))):
+                         dic[idx] =dr.iloc[0].tolist()[:-1]+[sejour]
+                    elif len((dr:=df_effectif.query('Prénom==@row.name1 and Nom==@row.name2'))):
+                         dic[idx] =dr.iloc[0].tolist()[:-1]+[sejour]
+                    else:
+                        print(f'no match, prénom:{row.name2}, nom: {row.name1}',row.name2,row.name1)
+                        no_match.append((row.name2,row.name1))
             else:
-                if len((dr:=df_effectif.query('Prénom==@row.name2 and Nom==@row.name1'))):
-                     dic[idx] =dr.iloc[0].tolist()[:-1]+[sejour]
-                elif len((dr:=df_effectif.query('Prénom==@row.name1 and Nom==@row.name2'))):
-                     dic[idx] =dr.iloc[0].tolist()[:-1]+[sejour]
-                else:
-                    print(f'no match, prénom:{row.name2}, nom: {row.name1}',row.name2,row.name1)
-                    no_match.append((row.name2,row.name1))
-        else:
-            print(f'WARNING: incorrect name {row.name1}, {row.name2}, {row.name3}')
-        
-    dg = pd.DataFrame.from_dict(dic).T 
-    dg.columns = ['N° Licencié','Nom','Prénom','sejour']
+                print(f'WARNING: incorrect name {row.name1}, {row.name2}, {row.name3}')
+
+        dg = pd.DataFrame.from_dict(dic).T 
+        dg.columns = ['N° Licencié','Nom','Prénom','Sexe','sejour',]
+    else:
+        dg = pd.DataFrame([[None,None,None,None,sejour,]], columns=['N° Licencié','Nom','Prénom','Sexe','sejour',])
     
     return dg
 
@@ -120,13 +123,15 @@ def correction_effectif():
     #3rd party import
     import yaml
     
-    path_cor_yaml = Path(__file__).parent.parent / Path('CTG_RefFiles/CTG_correction.yaml')
+    path_cor_yaml = Path(__file__).parent / Path('CTG_RefFiles/CTG_correction.yaml')
     
     with open(path_cor_yaml, "r",encoding='utf8') as stream:
         data_list_dict = yaml.safe_load(stream)
 
-    list_non_licencie = [(x.split(',')[0].strip(),x.split(',')[1].strip()) for x in data_list_dict['list_non_licencie']]
-    dic_part_club = [(x.split(',')[0].strip(),x.split(',')[1].strip()) for x in data_list_dict['dic_part_club']]
+    list_non_licencie = [(x.split(',')[0].strip(),x.split(',')[1].strip(),x.split(',')[2].strip())
+                         for x in data_list_dict['list_non_licencie']]
+    dic_part_club = [(x.split(',')[0].strip(),x.split(',')[1].strip(),x.split(',')[2].strip()) 
+                         for x in data_list_dict['dic_part_club']]
     dic_correction_licence = data_list_dict['dic_correction_licence']
     dic_correction_licence = {list(x.keys())[0] : list(x.values())[0] for x in dic_correction_licence}
     
@@ -140,7 +145,8 @@ def count_participation(path):
 
     import pandas as pd
 
-
+    filename = os.path.basename(path)
+    filename = filename.split('.', 1)[0]
     list_non_licencie, dic_correction_licence, dic_part_club = correction_effectif()
 
     df_effectif = read_effectif_corrected(dic_correction_licence, list_non_licencie, dic_part_club)
@@ -153,6 +159,7 @@ def count_participation(path):
 
     for sejour in sejours:
         dg = inscrit_sejour( path / Path(sejour),no_match,df_effectif)
+        dg['Type'] = filename
         print(f"Séjour :{sejour}, Nombre d'inscrits : {len(dg)}")
         df_list.append(dg)
         file_store = os.path.splitext(sejour)[0]+'.xlsx'
@@ -173,14 +180,16 @@ def count_participation(path):
     return(no_match,df_total,index)
 
 def parse_date(s,year):
+    
     import re
     from datetime import datetime 
 
-    convert_to_date = lambda s: datetime.strptime(s,"%Y_%d_%m")
+    convert_to_date = lambda s: datetime.strptime(s,"%Y_%m_%d")
 
-    re_date = r'\d{2}_\d{2}'
-    date = re.findall(re_date,s)[0]
-    return convert_to_date(str(year)+'_'+date)
+    pattern = re.compile(r"(?P<month>\b\d{1,2}[_,-])(?P<day>\d{1,2})")
+    match = pattern.search(s)
+    
+    return convert_to_date(str(year)+'_'+match.group("month")+match.group("day"))
     
 def read_effectif():
     

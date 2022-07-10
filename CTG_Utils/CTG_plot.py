@@ -1,7 +1,8 @@
 __all_ = ["built_lat_long",
           "plot_club_38",
           "plot_ctg",
-          "plot_vignoble",]
+          "plot_vignoble",
+          "stat_sorties_club",]
           
 from CTG_Utils.CTG_config import GLOBAL   
 
@@ -37,6 +38,7 @@ def plot_club_38():
 
     df['long'] = df['Ville'].map(dic_long)
     df['lat'] = df['Ville'].map(dic_lat)
+
 
 
     kol = folium.Map(location=[45.2,5.7], tiles='openstreetmap', zoom_start=12)
@@ -104,7 +106,6 @@ def plot_ctg(df):
 
     _,dh = built_lat_long(df)
 
-
     group_adjacent = lambda a, k: list(zip(*([iter(a)] * k))) 
 
     dict_cyclo = {}
@@ -149,7 +150,9 @@ def plot_ctg(df):
             ).add_to(kol)
     return kol
     
-def stat_sorties_club(path_sorties_jeudi):
+def stat_sorties_club(path_sorties_club):
+
+    import os
     
     import matplotlib.pyplot as plt 
     
@@ -157,7 +160,7 @@ def stat_sorties_club(path_sorties_jeudi):
     from CTG_Utils.CTG_effectif import count_participation
     from CTG_Utils.CTG_effectif import parse_date
     
-    no_match,df_total,_ = count_participation(path_sorties_jeudi)
+    no_match,df_total,_ = count_participation(path_sorties_club)
     if no_match:
         print(no_match)
 
@@ -165,18 +168,33 @@ def stat_sorties_club(path_sorties_jeudi):
     dic_age = dict(zip(df_effectif['N° Licencié'], df_effectif['Age']))
     dic_distance = dict(zip(df_effectif['N° Licencié'], df_effectif['distance']))
     dic_sexe = dict(zip(df_effectif['N° Licencié'], df_effectif['Sexe']))
+    dic_sexe[None] = 'irrelevant'
+    dic_vae =dict(zip(df_effectif['N° Licencié'],df_effectif['Pratique VAE']))
 
     df_total['Age'] = df_total['N° Licencié'].map(dic_age)
     df_total['distance'] = df_total['N° Licencié'].map(dic_distance)
     df_total['sexe'] = df_total['N° Licencié'].map(dic_sexe)
 
     df_total = df_total[df_total['sejour']!='aucun' ]
-    df_total['sejour'] = df_total['sejour'].apply(lambda s:parse_date(s,GLOBAL['YEAR']).strftime('%d-%m'))
-
-    df_total.groupby('sexe')['sejour'].value_counts().unstack().T.plot.bar(width=0.5, stacked=True)
+    df_total['sejour'] = df_total['sejour'].apply(lambda s:parse_date(s,GLOBAL['YEAR']).strftime('%m-%d'))
+    df_total['VAE'] = df_total['N° Licencié'].map(dic_vae)
+    df_total['VAE'].fillna('Non',inplace=True)
+    
+    dg = df_total.groupby(['sexe','VAE'])['sejour'].value_counts().unstack().T
+    try:
+        dg['irrelevant'] = dg['irrelevant'] - 1
+    except KeyError as error:
+        pass
+        
+    fig, ax = plt.subplots()
+    dg[['F','M']].plot(kind='bar', ax=ax, width=0.5, stacked=True)
     plt.ylabel('Nombre de licenciers')
     plt.xlabel('')
     plt.tick_params(axis='x', rotation=90)
+    plt.ylabel('Nombre de licenciers')
+    plt.xlabel('')
+    plt.tick_params(axis='x', rotation=90)
+    plt.title(os.path.basename(path_sorties_club).split('.')[0])
     
 def plot_vignoble():
 
@@ -197,7 +215,7 @@ def plot_vignoble():
     df_vignobles = pd.read_excel(r'C:\Users\franc\CTG\RANDONNEES\vignobles\listing_participants.xlsx')
     df = pd.merge(df_vignobles, df_club_38, on='N° FFCT', how='inner')
     df['femmes'] = df['femmes'].fillna(0)
-    df['total'] = df['hommes'] + df['femmes']
+    df['total'] =df['hommes']+df['femmes']
 
     #df =pd.read_excel(root / Path(effectif))
 
@@ -225,7 +243,7 @@ def plot_vignoble():
                                                         df['N° FFCT'],
                                                         df['total'] ):
 
-        long_ville, lat_ville = df.query("Ville==@ville")[['long','lat']].values[0]#.flatten()
+        long_ville, lat_ville =df.query("Ville==@ville")[['long','lat']].values[0]#.flatten()
         color='blue'
 
         folium.Circle(
@@ -236,15 +254,15 @@ def plot_vignoble():
                         fill=True,
     ).add_to(kol)
     return kol
-    
+
 def _distance(ϕ1, λ1,ϕ2, λ2):
     from math import asin, cos, radians, sin, sqrt
     ϕ1, λ1 = radians(ϕ1), radians(λ1)
     ϕ2, λ2 = radians(ϕ2), radians(λ2)
     rad = 6371
     dist = 2 * rad * asin(
-                          sqrt(
-                          sin((ϕ2 - ϕ1) / 2) ** 2
-                          + cos(ϕ1) * cos(ϕ2) * sin((λ2 - λ1) / 2) ** 2
-                          ))
+                            sqrt(
+                                sin((ϕ2 - ϕ1) / 2) ** 2
+                                + cos(ϕ1) * cos(ϕ2) * sin((λ2 - λ1) / 2) ** 2
+                            ))
     return dist
