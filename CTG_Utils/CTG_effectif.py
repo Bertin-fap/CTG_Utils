@@ -156,15 +156,21 @@ def count_participation(path):
     sejours = [x for x in os.listdir( path ) if x.endswith('.csv')]
     nbr_sejours = len(sejours)
     print(f"Nombre d'évènements : {nbr_sejours}")
-
+    
+    nbr_inscrits_mean = 0
+    counter = 1
     for sejour in sejours:
         dg = inscrit_sejour( path / Path(sejour),no_match,df_effectif)
         dg['Type'] = filename
-        print(f"Séjour :{sejour}, Nombre d'inscrits : {len(dg)}")
+        nbr_inscrits = len(dg.dropna())
+        if nbr_inscrits != 0:
+           nbr_inscrits_mean = nbr_inscrits_mean + (nbr_inscrits - nbr_inscrits_mean)/counter
+           counter += 1
+        print(f"Séjour :{sejour}, Nombre d'inscrits : {nbr_inscrits}")
         df_list.append(dg)
         file_store = os.path.splitext(sejour)[0]+'.xlsx'
         dg.to_excel(path / Path(file_store))
-
+    print(f'" moyen de participants : {nbr_inscrits_mean}')
     df_total = pd.concat(df_list,ignore_index=True)
 
 
