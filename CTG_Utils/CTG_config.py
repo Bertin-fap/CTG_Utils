@@ -1,6 +1,7 @@
 __all__ = ['GLOBAL']
 
 def _config_ctg():
+    # Reads the congiguration file
 
     # Standard library imports
     import os.path
