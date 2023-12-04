@@ -18,14 +18,12 @@ def read_effectif_corrected(dic_correction_licence, list_non_licencie, part_club
     import numpy as np
     import pandas as pd
     
-    prenom, nom, sexe = zip(*list_non_licencie)
-    dict_non_licencie = {'N° Licencié':np.array(range(len(nom)))+10, 'Prénom':prenom,'Nom':nom,'Sexe':sexe}
     
-    prenom, nom, sexe = zip(*part_club)
-    part_club = {'N° Licencié':list(range(len(part_club))), 'Prénom':prenom,'Nom':nom,'Sexe':sexe}
+    
 
     df_effectif = pd.read_excel(GLOBAL['ROOT'] / Path(GLOBAL['EFFECTIF']))
-    df_effectif = df_effectif[['N° Licencié', 'Nom','Prénom','Sexe']]
+    df_effectif = df_effectif[['N° Licencié', 'Nom','Prénom','Sexe','Pratique VAE']]
+    print(GLOBAL['EFFECTIF'])
     
         
     for num_licence in dic_correction_licence.keys():
@@ -33,11 +31,17 @@ def read_effectif_corrected(dic_correction_licence, list_non_licencie, part_club
         df_effectif.loc[idx,'Prénom'] = dic_correction_licence[num_licence]['Prénom']
         df_effectif.loc[idx,'Nom'] = dic_correction_licence[num_licence]['Nom']
         
+    prenom, nom, sexe = zip(*part_club)
+    part_club = {'N° Licencié':list(range(len(part_club))), 'Prénom':prenom,'Nom':nom,'Sexe':sexe}
     df_part_club = pd.DataFrame.from_dict(part_club)
     df_effectif = pd.concat([df_effectif, df_part_club], ignore_index=True, axis=0)
     
-    df_non_licencie = pd.DataFrame.from_dict(dict_non_licencie)
-    df_effectif = pd.concat([df_effectif, df_non_licencie], ignore_index=True, axis=0)
+    if list_non_licencie:
+        prenom, nom, sexe = zip(*list_non_licencie)
+        dict_non_licencie = {'N° Licencié':np.array(range(len(nom)))+10, 'Prénom':prenom,'Nom':nom,'Sexe':sexe}
+    
+        df_non_licencie = pd.DataFrame.from_dict(dict_non_licencie)
+        df_effectif = pd.concat([df_effectif, df_non_licencie], ignore_index=True, axis=0)
     
     df_effectif['Prénom1'] = df_effectif['Prénom'].str[0]
     df_effectif['Prénom'] = df_effectif['Prénom'].str.replace(' ','-')
@@ -109,7 +113,10 @@ def inscrit_sejour(file,no_match,df_effectif):
                 print(f'WARNING: incorrect name {row.name1}, {row.name2}, {row.name3}')
 
         dg = pd.DataFrame.from_dict(dic).T 
-        dg.columns = ['N° Licencié','Nom','Prénom','Sexe','sejour',]
+        if len(dg) !=0:
+            dg.columns = ['N° Licencié','Nom','Prénom','Sexe','Pratique VAE','sejour',]
+        else:
+            dg = pd.DataFrame([[None,None,None,None,sejour,]], columns=['N° Licencié','Nom','Prénom','Sexe','sejour',])
     else:
         dg = pd.DataFrame([[None,None,None,None,sejour,]], columns=['N° Licencié','Nom','Prénom','Sexe','sejour',])
     
@@ -127,9 +134,11 @@ def correction_effectif():
     
     with open(path_cor_yaml, "r",encoding='utf8') as stream:
         data_list_dict = yaml.safe_load(stream)
-
-    list_non_licencie = [(x.split(',')[0].strip(),x.split(',')[1].strip(),x.split(',')[2].strip())
-                         for x in data_list_dict['list_non_licencie']]
+    
+    list_non_licencie  = []   
+    if data_list_dict['list_non_licencie']:
+        list_non_licencie = [(x.split(',')[0].strip(),x.split(',')[1].strip(),x.split(',')[2].strip())
+                             for x in data_list_dict['list_non_licencie']]
     dic_part_club = [(x.split(',')[0].strip(),x.split(',')[1].strip(),x.split(',')[2].strip()) 
                          for x in data_list_dict['dic_part_club']]
     dic_correction_licence = data_list_dict['dic_correction_licence']
@@ -169,6 +178,7 @@ def count_participation(path):
         print(f"Séjour :{sejour}, Nombre d'inscrits : {nbr_inscrits}")
         df_list.append(dg)
         file_store = os.path.splitext(sejour)[0]+'.xlsx'
+        print('verif....',file_store,path) #<--- to delete
         dg.to_excel(path / Path(file_store))
     print(f'" moyen de participants : {nbr_inscrits_mean}')
     df_total = pd.concat(df_list,ignore_index=True)
@@ -191,13 +201,21 @@ def parse_date(s,year):
     from datetime import datetime 
 
     convert_to_date = lambda s: datetime.strptime(s,"%Y_%m_%d")
+    s = re.sub(r"-","_",s)
+    
+    try:
+        pattern = re.compile(r"(?P<year>\b\d{4}_)(?P<month>\d{1,2}_)(?P<day>\d{1,2})")
+        match = pattern.search(s)
+        date = convert_to_date(match.group("year")+match.group("month")+match.group("day"))
+    except:
+        pattern = re.compile(r"(?P<month>\d{1,2}_)(?P<day>\d{1,2})")
+        match = pattern.search(s)
+        date = convert_to_date(str(year)+'_'+match.group("month")+match.group("day"))
+    
+    return date
 
-    pattern = re.compile(r"(?P<month>\b\d{1,2}[_,-])(?P<day>\d{1,2})")
-    match = pattern.search(s)
     
-    return convert_to_date(str(year)+'_'+match.group("month")+match.group("day"))
-    
-def read_effectif():
+def read_effectif(year = None):
     
     from pathlib import Path
     
@@ -206,6 +224,7 @@ def read_effectif():
     
     from CTG_Utils.CTG_plot import built_lat_long
 
+        
     def distance_(row):
         from math import asin, cos, radians, sin, sqrt
         phi1, lon1 = dh.query("Ville=='GRENOBLE'")[['long','lat']].values.flatten()
@@ -218,12 +237,25 @@ def read_effectif():
                                     + cos(phi1) * cos(phi2) * sin((lon2 - lon1) / 2) ** 2
                                 ))
         return np.round(dist,1)
+    
+    def certificat_medical(row):
+        if row['Certificat médical'] != 'Non':
+            return '01/01/2000'
+        else:
+            return row['Date du certificat']
 
-
-    df =pd.read_excel(GLOBAL['ROOT'] / Path(GLOBAL['EFFECTIF']))
+    if year is None:
+        df = pd.read_excel(GLOBAL['ROOT'] / Path(GLOBAL['EFFECTIF']))
+    else:
+        df = pd.read_excel(GLOBAL['ROOT'] / Path(str(year)+'.xlsx'))
+        
     df['Date de naissance'] = pd.to_datetime(df['Date de naissance'], format="%d/%m/%Y")
-    df['Age']  = df['Date de naissance'].apply(lambda x : (pd.Timestamp.today()-x).days/365)
-    df['Date du certificat'] = df['Date du certificat'].apply(lambda x : x if x != 'Non' else '01/01/2000')
+    
+    #df['Age']  = df['Date de naissance'].apply(lambda x : (pd.Timestamp.today()-x).days/365)
+    
+    df['Age']  = df['Date de naissance'].apply(lambda x : (pd.Timestamp(year, 6, 15)-x).days/365)
+    df['Date du certificat'] = df.apply(certificat_medical,axis=1)
+    #return df
     df['Date du certificat'] = pd.to_datetime(df['Date du certificat'], format="%d/%m/%Y")
     df['Limite certificat médical']  = df['Date du certificat'].apply(lambda x : (pd.Timestamp.today()-x).days/365)
 

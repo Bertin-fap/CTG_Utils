@@ -74,6 +74,18 @@ def built_lat_long(df):
     import pandas as pd
     
     path_villes_de_france = Path(__file__).parent / Path('CTG_RefFiles/villes_france_premium.csv')
+    
+    def normalize_ville(x):
+        dic_ville = {'SAINT-HILAIRE-DU-TOUVET':"SAINT-HILAIRE-38",
+                     'SAINT-HILAIRE':"SAINT-HILAIRE-38",
+                     'LAVAL-EN-BELLEDONNE':'LAVAL-38',
+                     'LAVAL':"LAVAL-38",
+                     'CRETS-EN-BELLEDONNE':"SAINT-PIERRE-D'ALLEVARD"}
+        if x in dic_ville.keys(): 
+            return dic_ville[x]
+        else:
+            return x
+        
     df_villes = pd.read_csv(path_villes_de_france,header=None,usecols=[3,19,20])
     dic_long = dict(zip(df_villes[3] , df_villes[19]))
     dic_lat = dict(zip(df_villes[3] , df_villes[20]))
@@ -83,9 +95,9 @@ def built_lat_long(df):
     df['Ville'] = df['Ville'].str.replace('\-D\-+',"-D'",regex=True)
     df['Ville'] = df['Ville'].str.replace('^LA-',"LA ",regex=True)
     df['Ville'] = df['Ville'].str.replace('^LE-',"LE ",regex=True)
-    df['Ville'] = df['Ville'].str.replace('SAINT-HILAIRE-DU-TOUVET',"SAINT-HILAIRE",regex=False)
-    df['Ville'] = df['Ville'].str.replace('SAINT-HILAIRE',"SAINT-HILAIRE-38",regex=False)
-    df['Ville'] = df['Ville'].str.replace('LAVAL',"LAVAL-38",regex=False)
+    
+    df['Ville'] = df['Ville'].apply(normalize_ville)
+    
 
     df['long'] = df['Ville'].map(dic_long)
     df['lat'] = df['Ville'].map(dic_lat)
@@ -103,7 +115,7 @@ def plot_ctg(df):
     
     # 3rd party imports
     import folium
-
+    trace_radius = True
     _,dh = built_lat_long(df)
 
     group_adjacent = lambda a, k: list(zip(*([iter(a)] * k))) 
@@ -119,19 +131,19 @@ def plot_ctg(df):
     kol = folium.Map(location=[45.2,5.7], tiles='openstreetmap', zoom_start=12)
 
     long_genoble, lat_grenoble = dh.query("Ville=='GRENOBLE'")[['long','lat']].values.flatten()
-
-    folium.Circle(
-                location=[lat_grenoble, long_genoble],
-                radius=51000,
-                popup='50 km ',
-                color="black",
-                fill=False,
-            ).add_to(kol)        
+    if trace_radius:
+        folium.Circle(
+                      location=[lat_grenoble, long_genoble],
+                      radius=8466,
+                      popup='50 km ',
+                      color="black",
+                      fill=False,
+                      ).add_to(kol)        
     for latitude,longitude,size, ville in zip(dh['lat'],dh['long'],dh['number'],dh['Ville']):
 
         long_ville, lat_ville =dh.query("Ville==@ville")[['long','lat']].values.flatten()
         dist_grenoble_ville = _distance(lat_grenoble, long_genoble,lat_ville, long_ville )
-        color='red' if dist_grenoble_ville>50  else 'blue'
+        color='red' if dist_grenoble_ville>19.35 else 'blue'
         if ville == "grenoble":
             folium.Circle(
                 location=[latitude, longitude],
@@ -150,51 +162,97 @@ def plot_ctg(df):
             ).add_to(kol)
     return kol
     
-def stat_sorties_club(path_sorties_club):
+def stat_sorties_club(path_sorties_club, ylim=None,file_label=None):
 
     import os
     
     import matplotlib.pyplot as plt 
+    import yaml
+    from yaml.loader import SafeLoader
     
     from CTG_Utils.CTG_effectif import read_effectif
+    from CTG_Utils.CTG_effectif import correction_effectif
+    from CTG_Utils.CTG_effectif import read_effectif_corrected
     from CTG_Utils.CTG_effectif import count_participation
     from CTG_Utils.CTG_effectif import parse_date
+    from CTG_Utils.CTG_config import GLOBAL 
+    
+    def addlabels(x,y):
+        for i in range(len(x)):
+            if x[i] in info_rando.keys():
+                plt.text(i-0.2,y[i]+1,
+                         info_rando[x[i]][0],
+                         size=10,
+                         rotation=90,
+                         color=info_rando[x[i]][1]
+                         )
+    if file_label is not None and os.path.isfile(file_label):
+        flag_labels = True
+        with open(file_label,'r') as f:
+            v = yaml.load(f,Loader=SafeLoader)
+            info_rando = v['INFO_RANDO']
+    else:
+        flag_labels = False
     
     no_match,df_total,_ = count_participation(path_sorties_club)
     if no_match:
         print(no_match)
 
-    df_effectif = read_effectif()
-    dic_age = dict(zip(df_effectif['N° Licencié'], df_effectif['Age']))
-    dic_distance = dict(zip(df_effectif['N° Licencié'], df_effectif['distance']))
+    #df_effectif = read_effectif()
+    list_non_licencie, dic_correction_licence, dic_part_club = correction_effectif()
+    df_effectif = read_effectif_corrected(dic_correction_licence,
+                                          list_non_licencie,
+                                          dic_part_club)
+    
+    #dic_age = dict(zip(df_effectif['N° Licencié'], df_effectif['Age']))
+    #dic_distance = dict(zip(df_effectif['N° Licencié'], df_effectif['distance']))
     dic_sexe = dict(zip(df_effectif['N° Licencié'], df_effectif['Sexe']))
     dic_sexe[None] = 'irrelevant'
     dic_vae =dict(zip(df_effectif['N° Licencié'],df_effectif['Pratique VAE']))
 
-    df_total['Age'] = df_total['N° Licencié'].map(dic_age)
-    df_total['distance'] = df_total['N° Licencié'].map(dic_distance)
+    #df_total['Age'] = df_total['N° Licencié'].map(dic_age)
+    #df_total['distance'] = df_total['N° Licencié'].map(dic_distance)
     df_total['sexe'] = df_total['N° Licencié'].map(dic_sexe)
 
     df_total = df_total[df_total['sejour']!='aucun' ]
-    df_total['sejour'] = df_total['sejour'].apply(lambda s:parse_date(s,GLOBAL['YEAR']).strftime('%m-%d'))
+    df_total['sejour'] = df_total['sejour'].apply(lambda s:parse_date(s,GLOBAL['YEAR']).strftime('%y-%m-%d'))
     df_total['VAE'] = df_total['N° Licencié'].map(dic_vae)
     df_total['VAE'].fillna('Non',inplace=True)
     
     dg = df_total.groupby(['sexe','VAE'])['sejour'].value_counts().unstack().T
+   
     try:
         dg['irrelevant'] = dg['irrelevant'] - 1
     except KeyError as error:
         pass
         
-    fig, ax = plt.subplots()
-    dg[['F','M']].plot(kind='bar', ax=ax, width=0.5, stacked=True)
-    plt.ylabel('Nombre de licenciers')
+    fig, ax = plt.subplots(figsize=(15, 5))
+    print(dg[['F','M']].keys())
+    
+    dg[['F','M']].plot(kind='bar',
+                       ax=ax,
+                       width=0.5,
+                       stacked=True,
+                       color = {('F', 'Non'): '#1f77b4',
+                                ('F', 'Oui'): '#ff7f0e',
+                                ('M', 'Non'): '#2ca02c',
+                                ('M', 'Oui'): '#d62728',} )
+    
+    if flag_labels : addlabels(dg.index,dg.sum(axis=1).astype(int).tolist())
+    
     plt.xlabel('')
-    plt.tick_params(axis='x', rotation=90)
-    plt.ylabel('Nombre de licenciers')
+    plt.tick_params(axis='x', rotation=90,labelsize=20)
+    plt.ylabel('Nombre de licenciers',size=20)
     plt.xlabel('')
-    plt.tick_params(axis='x', rotation=90)
-    plt.title(os.path.basename(path_sorties_club).split('.')[0])
+    plt.tick_params(axis='x', rotation=90,labelsize=20)
+    plt.tick_params(axis='y',labelsize=20)
+    #plt.title(os.path.basename(path_sorties_club).split('.')[0])
+    if ylim is not None:
+        plt.ylim(ylim)
+    plt.legend(bbox_to_anchor =(0.75, 1.15), ncol = 2)
+    
+    return
+
     
 def plot_vignoble():
 
